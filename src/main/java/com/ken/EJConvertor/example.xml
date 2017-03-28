@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<configuration xmlns="http://www.ken.com/schema/test"
+               xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+               xsi:schemaLocation="http://www.ken.com/schema/test EJConvertor.xsd">
+	<entity class="com.ken.wms.domain.Supplier">
+		<property>
+			<field>name</field>
+			<value>供应商名</value>
+		</property>
+		<property>
+			<field>personInCharge</field>
+			<value>负责人</value>
+		</property>
+		<property>
+			<field>tel</field>
+			<value>联系电话</value>
+		</property>
+		<property>
+			<field>email</field>
+			<value>电子邮件</value>
+		</property>
+		<property>
+			<field>address</field>
+			<value>供应商地址</value>
+		</property>
+	</entity>
+</configuration>

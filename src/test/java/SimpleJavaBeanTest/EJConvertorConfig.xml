@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<configuration xmlns="http://www.ken.com/schema/test"
+               xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+               xsi:schemaLocation="http://www.ken.com/schema/test xmlXSD.xsd">
+
+    <entity class="SimpleJavaBeanTest.User">
+        <property>
+            <field>id</field>
+            <value>用户ID</value>
+        </property>
+        <property>
+            <field>userName</field>
+            <value>用户名</value>
+        </property>
+        <property>
+            <field>gender</field>
+            <value>性别</value>
+        </property>
+    </entity>
+
+</configuration>
