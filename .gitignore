@@ -12,7 +12,7 @@
 hs_err_pid*
 
 # For Intellij IDEA
-.idea
+/.idea/
 ExcelJavaBeanConvertor.iml
 
 # Maven project

@@ -4,18 +4,80 @@
                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                xsi:schemaLocation="http://www.ken.com/schema/test xmlXSD.xsd">
 
-    <entity class="SimpleJavaBeanTest.User">
+    <entity class="SimpleJavaBeanTest.JavaBean">
         <property>
-            <field>id</field>
-            <value>用户ID</value>
+            <field>charType</field>
+            <value>char原始类型</value>
         </property>
         <property>
-            <field>userName</field>
-            <value>用户名</value>
+            <field>booleanType</field>
+            <value>boolean原始类型</value>
         </property>
         <property>
-            <field>gender</field>
-            <value>性别</value>
+            <field>shortType</field>
+            <value>short原始类型</value>
+        </property>
+        <property>
+            <field>byteType</field>
+            <value>byte原始类型</value>
+        </property>
+        <property>
+            <field>intType</field>
+            <value>int原始类型</value>
+        </property>
+        <property>
+            <field>longType</field>
+            <value>long原始类型</value>
+        </property>
+        <property>
+            <field>floatType</field>
+            <value>float原始类型</value>
+        </property>
+        <property>
+            <field>doubleType</field>
+            <value>double原始类型</value>
+        </property>
+
+        <property>
+            <field>charBoxType</field>
+            <value>char包装类型</value>
+        </property>
+        <property>
+            <field>booleanBoxType</field>
+            <value>boolean包装类型</value>
+        </property>
+        <property>
+            <field>shortBoxType</field>
+            <value>short包装类型</value>
+        </property>
+        <property>
+            <field>byteBoxType</field>
+            <value>byte包装类型</value>
+        </property>
+        <property>
+            <field>intBoxType</field>
+            <value>int包装类型</value>
+        </property>
+        <property>
+            <field>longBoxType</field>
+            <value>long包装类型</value>
+        </property>
+        <property>
+            <field>floatBoxType</field>
+            <value>float包装类型</value>
+        </property>
+        <property>
+            <field>doubleBoxType</field>
+            <value>double包装类型</value>
+        </property>
+
+        <property>
+            <field>utilDate</field>
+            <value>util类型的日期</value>
+        </property>
+        <property>
+            <field>sqlDate</field>
+            <value>sql类型的日期</value>
         </property>
     </entity>
 

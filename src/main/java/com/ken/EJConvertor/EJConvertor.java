@@ -1,5 +1,6 @@
 package com.ken.EJConvertor;
 
+import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.w3c.dom.Document;
@@ -16,7 +17,6 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Method;
-import java.text.DecimalFormat;
 import java.util.*;
 
 /**
@@ -30,13 +30,13 @@ public class EJConvertor {
      */
     private static final String DEFAULT_CONFIG_FILE_NAME = "EJConvertorConfig.xml";
 
-    private static final String ENTITY_NODE = "entity";
+    private static final String ENTITY_ELEMENT = "entity";
 
-    private static final String PROPERTY_NODE = "property";
+    private static final String PROPERTY_ELEMENT = "property";
 
-    private static final String FIELD_NODE = "field";
+    private static final String FIELD_ELEMENT = "field";
 
-    private static final String VALUE_NODE = "value";
+    private static final String VALUE_ELEMENT = "value";
 
     private static final String CLASS_ATTRIBUTE = "class";
 
@@ -66,7 +66,7 @@ public class EJConvertor {
             Document doc = documentBuilder.parse(configFile);
 
             // 读取所有的 Entity 节点
-            NodeList entities = doc.getElementsByTagName(ENTITY_NODE);
+            NodeList entities = doc.getElementsByTagName(ENTITY_ELEMENT);
             int entities_num = entities.getLength();
 
             // 创建excelJavaBeanMap
@@ -92,7 +92,7 @@ public class EJConvertor {
                     mappingInfo.setClassName(className);
 
                     // 读取 Property 节点
-                    NodeList properties = entityElement.getElementsByTagName(PROPERTY_NODE);
+                    NodeList properties = entityElement.getElementsByTagName(PROPERTY_ELEMENT);
                     int properties_num = properties.getLength();
 
                     // 解析 Property 节点
@@ -104,9 +104,9 @@ public class EJConvertor {
                             int infoNode_num = infoNodes.getLength();
                             for (int infoNode_index = 0; infoNode_index < infoNode_num; infoNode_index++) {
                                 infoNode = infoNodes.item(infoNode_index);
-                                if (infoNode.getNodeName().equals(FIELD_NODE))
+                                if (infoNode.getNodeName().equals(FIELD_ELEMENT))
                                     field = infoNode.getTextContent();
-                                if (infoNode.getNodeName().equals(VALUE_NODE))
+                                if (infoNode.getNodeName().equals(VALUE_ELEMENT))
                                     value = infoNode.getTextContent();
                             }
                             if (field != null && value != null) {
@@ -134,12 +134,13 @@ public class EJConvertor {
      * @param file      数据来源的 Excel 文件
      * @return 包含若干个目标对象实例的 List
      */
-    public List<Object> excelReader(Class<?> classType, File file) {
-        if (file == null)
+    public <T> List<T> excelReader(Class<T> classType, File file) {
+        // 参数检查
+        if (file == null || classType == null)
             return null;
 
         // 初始化存放读取结果的 List
-        List<Object> content = new ArrayList<>();
+        List<T> content = new ArrayList<>();
 
         // 获取类名和映射信息
         String className = classType.getName();
@@ -158,47 +159,45 @@ public class EJConvertor {
             // 读取第一行表头信息
             if (!rowIterator.hasNext())
                 return null;
-            List<String> methodList = new ArrayList<>();// setter 方法列表
-            List<Class<?>> fieldTypeList = new ArrayList<>();// 目标对象属性类型列表
+            List<Class<?>> fieldTypeList = new ArrayList<>();// 目标对象 field 类型列表
+            List<String> fieldNameList = new ArrayList<>();// 目标对象的 field 名称列表
             row = rowIterator.next();
             cellIterator = row.iterator();
-            String field;
+            String fieldName;
             while (cellIterator.hasNext()) {
                 cell = cellIterator.next();
-                field = mappingInfo.getValueFieldMapping(cell.getStringCellValue());
-                Class<?> fieldType = classType.getDeclaredField(field).getType();
 
+                // 获取 field 的名称以及类型
+                fieldName = mappingInfo.getValueFieldMapping(cell.getStringCellValue());
+                Class<?> fieldType = classType.getDeclaredField(fieldName).getType();
+
+                // 保存 field 的名称和类型信息
                 fieldTypeList.add(cell.getColumnIndex(), fieldType);
-                methodList.add(cell.getColumnIndex(), getSetterMethodName(field));
+                fieldNameList.add(cell.getColumnIndex(), fieldName);
             }
 
             // 逐行读取表格内容，创建对象赋值并导入
             while (rowIterator.hasNext()) {
                 row = rowIterator.next();
                 cellIterator = row.iterator();
-                Object elem = classType.newInstance();
+                T bean = classType.newInstance();
 
                 // 读取单元格
                 while (cellIterator.hasNext()) {
                     cell = cellIterator.next();
                     int columnIndex = cell.getColumnIndex();
 
-                    Class<?> fieldType = fieldTypeList.get(columnIndex);
-                    String methodName = methodList.get(columnIndex);
-
                     // 获取单元格的值，并设置对象中对应的属性
-                    Object value = getCellValue(fieldType, cell);
-                    if (value == null) continue;
-                    setField(elem, methodName, value);
+                    Object fieldValue = getCellValue(fieldTypeList.get(columnIndex), cell);
+                    if (fieldValue == null) continue;
+                    setField(bean, fieldNameList.get(columnIndex), fieldValue);
                 }
                 // 放入结果
-                content.add(elem);
+                content.add(bean);
             }
-
         } catch (Exception e) {
             e.printStackTrace();
         }
-
         return content;
     }
 
@@ -210,7 +209,7 @@ public class EJConvertor {
      * @return 返回excel文件
      */
     public File excelWriter(Class<?> classType, List<?> elems) {
-
+        // 参数检查
         if (classType == null || elems == null)
             return null;
 
@@ -226,12 +225,10 @@ public class EJConvertor {
             excel = File.createTempFile("excel", ".xlsx");
 
             // 获取该 class 中定义的 field, 并将对应的信息保存到 List 中
-            List<String> fieldList = new ArrayList<>();
             List<String> methodList = new ArrayList<>();
             List<String> valuesList = new ArrayList<>();
             Set<String> fields = mappingInfo.getFieldValueMapping().keySet();
             for (String field : fields) {
-                fieldList.add(field);
                 methodList.add(getGetterMethodName(field));
                 valuesList.add(mappingInfo.getFieldValueMapping(field));
             }
@@ -262,7 +259,7 @@ public class EJConvertor {
                 for (String methodName : methodList) {
                     Object value = getField(elem, methodName);
                     cell = row.createCell(cellCount++);
-                    setCellValue(value, workbook, cell);
+                    setCellValue1(value, workbook, cell);
                 }
             }
 
@@ -282,78 +279,114 @@ public class EJConvertor {
     }
 
     /**
-     * 该方法用于获取单元格 cell 中的值
+     * 获取 Excel 单元格中的值
      *
-     * @param fieldType 指定获取的值的类型
-     * @param cell      单元格
-     * @return 单元格中的值
+     * @param fieldClass JavaBean 属性字段的类型
+     * @param cell       单元格
+     * @param <T>        泛型类型
+     * @return 返回 JavaBean 属性类型对应的值
      */
-    private Object getCellValue(Class<?> fieldType, Cell cell) {
-        if (cell == null)
-            return null;
+    @SuppressWarnings("unchecked")
+    private <T> T getCellValue(Class<T> fieldClass, Cell cell) {
 
-        int cellType = cell.getCellType();
-        Object value = null;
-        if (cellType == Cell.CELL_TYPE_STRING) {
-            if (fieldType.equals(String.class)) {
-                value = cell.getStringCellValue();
-            }
-        } else if (cellType == Cell.CELL_TYPE_NUMERIC) {
-            if (fieldType.equals(String.class)) {
-                value = new DecimalFormat("0").format(cell.getNumericCellValue());
-            } else if (fieldType.equals(java.sql.Date.class)) {// && HSSFDateUtil.isCellDateFormatted(cell)
-                value = new java.sql.Date(cell.getDateCellValue().getTime());
-            } else if (fieldType.equals(Long.class)) {
-                Double v = cell.getNumericCellValue();
-                value = v.longValue();
-            } else if (fieldType.equals(Integer.class)) {
-                Double v = cell.getNumericCellValue();
-                value = v.intValue();
-            } else {
-                value = cell.getNumericCellValue();
-            }
-        } else if (cellType == Cell.CELL_TYPE_BOOLEAN) {
-            if (fieldType.equals(Boolean.class)) {
-                value = cell.getBooleanCellValue();
-            }
-        } else if (cellType == Cell.CELL_TYPE_FORMULA) {
+        // 获取 cell 的值
+        cell.setCellType(Cell.CELL_TYPE_STRING);
+        String cellValue = cell.getStringCellValue();
+        // field 对值
+        T fieldValue = null;
 
-        } else if (cellType == Cell.CELL_TYPE_ERROR) {
-
-        } else if (cellType == Cell.CELL_TYPE_BLANK) {
-
+        if (fieldClass == int.class || fieldClass == Integer.class) {
+            // convert to Integer
+            Integer integer = NumberUtils.isNumber(cellValue) ? Double.valueOf(cellValue).intValue() : 0;
+            fieldValue = (T) integer;
+        } else if (fieldClass == long.class || fieldClass == Long.class) {
+            // convert to Long
+            Long l = NumberUtils.isNumber(cellValue) ? Double.valueOf(cellValue).longValue() : 0;
+            fieldValue = (T) l;
+        } else if (fieldClass == float.class || fieldClass == Float.class) {
+            // convert to Float
+            Float f = NumberUtils.isNumber(cellValue) ? Float.valueOf(cellValue) : 0;
+            fieldValue = (T) f;
+        } else if (fieldClass == double.class || fieldClass == Double.class) {
+            // convert to Double
+            Double d = NumberUtils.isNumber(cellValue) ? Double.valueOf(cellValue) : 0;
+            fieldValue = (T) d;
+        } else if (fieldClass == short.class || fieldClass == Short.class) {
+            // convert to Short
+            Short s = NumberUtils.isNumber(cellValue) ? Double.valueOf(cellValue).shortValue() : 0;
+            fieldValue = (T) s;
+        } else if (fieldClass == boolean.class || fieldClass == Boolean.class) {
+            // get Boolean
+            cell.setCellType(Cell.CELL_TYPE_BOOLEAN);
+            Boolean b = cell.getBooleanCellValue();
+            fieldValue = (T) b;
+        } else if (fieldClass == char.class || fieldClass == Character.class) {
+            // convert to Character
+            Character c = cellValue.charAt(0);
+            fieldValue = (T) c;
+        } else if (fieldClass == byte.class || fieldClass == Byte.class) {
+            // convert to Byte
+            Byte b = NumberUtils.isNumber(cellValue) ? Double.valueOf(cellValue).byteValue() : 0;
+            fieldValue = (T) b;
+        } else if (fieldClass == String.class) {
+            // convert to String
+            fieldValue = (T) cellValue;
+        } else if (fieldClass == java.util.Date.class) {
+            // convert to java.util.Date
+            cell.setCellType(Cell.CELL_TYPE_NUMERIC);
+            java.util.Date d = cell.getDateCellValue();
+            fieldValue = (T) d;
+        } else if (fieldClass == java.sql.Date.class) {
+            // convert to java.sql.Date
+            cell.setCellType(Cell.CELL_TYPE_NUMERIC);
+            java.sql.Date d = new java.sql.Date(cell.getDateCellValue().getTime());
+            fieldValue = (T) d;
         }
-        return value;
+
+        return fieldValue;
     }
 
     /**
-     * 设置 Excel 单元格的值
+     * 设置单元格的值
      *
-     * @param value 值
-     * @param cell  单元格
+     * @param cellValue 单元格的值
+     * @param workbook  workbook
+     * @param cell      单元格
      */
-    private void setCellValue(Object value, Workbook workbook, Cell cell) {
-        if (cell == null || value == null)
+    private void setCellValue1(Object cellValue, Workbook workbook, Cell cell) {
+        // 参数检查
+        if (cell == null || cellValue == null || workbook == null)
             return;
 
-        Class<?> valueClassType = value.getClass();
-        if (valueClassType.equals(String.class)) {
-            String v = (String) value;
+        Class<?> cellValueClass = cellValue.getClass();
+        if (cellValueClass == boolean.class || cellValueClass == Boolean.class) {
+            cell.setCellValue((Boolean) cellValue);
+        } else if (cellValueClass == char.class || cellValueClass == Character.class) {
+            cell.setCellValue(String.valueOf(cellValue));
+        } else if (cellValueClass == byte.class || cellValueClass == Byte.class) {
+            cell.setCellValue((Byte) cellValue);
+        } else if (cellValueClass == short.class || cellValueClass == Short.class) {
+            cell.setCellValue((Short) cellValue);
+        } else if (cellValueClass == int.class || cellValueClass == Integer.class) {
+            cell.setCellValue((Integer) cellValue);
+        } else if (cellValueClass == long.class || cellValueClass == Long.class) {
+            cell.setCellValue((Long) cellValue);
+        } else if (cellValueClass == float.class || cellValueClass == Float.class) {
+            cell.setCellValue(String.valueOf(cellValue));
+//            cell.setCellValue((Float) cellValue);
+        } else if (cellValueClass == double.class || cellValueClass == Double.class) {
+            cell.setCellValue((Double) cellValue);
+        } else if (cellValueClass == String.class) {
+            cell.setCellValue((String) cellValue);
+        } else if (cellValueClass == java.util.Date.class) {
+            java.util.Date v = (java.util.Date) cellValue;
+            CellStyle cellStyle = workbook.createCellStyle();
+            CreationHelper creationHelper = workbook.getCreationHelper();
+            cellStyle.setDataFormat(creationHelper.createDataFormat().getFormat("yyyy/mm/dd"));
             cell.setCellValue(v);
-        } else if (valueClassType.equals(Integer.class)) {
-            Integer v = (Integer) value;
-            cell.setCellValue(v);
-        } else if (valueClassType.equals(Long.class)) {
-            Long v = (Long) value;
-            cell.setCellValue(v);
-        } else if (valueClassType.equals(Double.class)) {
-            Double v = (Double) value;
-            cell.setCellValue(v);
-        } else if (valueClassType.equals(Boolean.class)) {
-            Boolean v = (Boolean) value;
-            cell.setCellValue(v);
-        } else if (valueClassType.equals(java.sql.Date.class)) {
-            java.sql.Date v = (java.sql.Date) value;
+            cell.setCellStyle(cellStyle);
+        } else if (cellValueClass == java.sql.Date.class) {
+            java.sql.Date v = (java.sql.Date) cellValue;
             CellStyle cellStyle = workbook.createCellStyle();
             CreationHelper creationHelper = workbook.getCreationHelper();
             cellStyle.setDataFormat(creationHelper.createDataFormat().getFormat("yyyy/mm/dd"));
@@ -363,21 +396,21 @@ public class EJConvertor {
     }
 
     /**
-     * 该方法用于设置对象中属性的值 通过调用目标对象属性对应的 setter 方法，因而要求目标对象必须设置 setter对象，否则赋值不成功
+     * 设置 JavaBean 指定 field 的值
      *
-     * @param targetObject 目标对象
-     * @param methodName   setter 方法名
-     * @param field        方法参数的值
+     * @param targetObject 指定的 JavaBean 对象
+     * @param fieldName    属性字段的名称
+     * @param fieldValue   属性字段的值
      * @throws Exception Exception
      */
-    private void setField(Object targetObject, String methodName, Object field) throws Exception {
-        // 获得 setter 方法实例
-        Class<?> targetObjectType = targetObject.getClass();
-        Class<?> fieldType = field.getClass();
-        Method setterMethod = targetObjectType.getMethod(methodName, fieldType);
+    private void setField(Object targetObject, String fieldName, Object fieldValue) throws Exception {
+        // 获取对应的 setter 方法
+        Class<?> targetObjectClass = targetObject.getClass();
+        Class<?> fieldClass = targetObjectClass.getDeclaredField(fieldName).getType();
+        Method setterMethod = targetObjectClass.getMethod(getSetterMethodName(fieldName), fieldClass);
 
-        // 调用方法
-        setterMethod.invoke(targetObject, field);
+        // 调用 setter 方法，设置 field 的值
+        setterMethod.invoke(targetObject, fieldValue);
     }
 
     /**
