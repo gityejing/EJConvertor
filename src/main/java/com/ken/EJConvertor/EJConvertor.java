@@ -20,6 +20,8 @@ import java.lang.reflect.Method;
 import java.util.*;
 
 /**
+ * Excel -JavaBean 转换器
+ *
  * @author Ken
  * @since 2017/3/27.
  */
@@ -30,14 +32,30 @@ public class EJConvertor {
      */
     private static final String DEFAULT_CONFIG_FILE_NAME = "EJConvertorConfig.xml";
 
+    /**
+     * Entity 节点名称
+     */
     private static final String ENTITY_ELEMENT = "entity";
 
+    /**
+     * Property 节点名称
+     */
     private static final String PROPERTY_ELEMENT = "property";
 
+
+    /**
+     * Field 节点信息
+     */
     private static final String FIELD_ELEMENT = "field";
 
+    /**
+     * Value 节点信息
+     */
     private static final String VALUE_ELEMENT = "value";
 
+    /**
+     * class 属性
+     */
     private static final String CLASS_ATTRIBUTE = "class";
 
     /**
@@ -60,69 +78,95 @@ public class EJConvertor {
      */
     private void init(String fileLocation) {
         try {
-            // 读取配置文件并创建DOC对象
+            // 读取配置文件
             File configFile = new File(fileLocation);
             DocumentBuilder documentBuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
             Document doc = documentBuilder.parse(configFile);
 
-            // 读取所有的 Entity 节点
-            NodeList entities = doc.getElementsByTagName(ENTITY_ELEMENT);
-            int entities_num = entities.getLength();
-
-            // 创建excelJavaBeanMap
-            this.excelJavaBeanMap = new HashMap<>(entities_num);
-
-            Node entityNode;
-            Node propertyNode;
-            Node infoNode;
-            Element entityElement;
-            // 解析 Entity 节点
-            for (int entity_index = 0; entity_index < entities_num; entity_index++) {
-                entityNode = entities.item(entity_index);
-                if (entityNode.getNodeType() == Node.ELEMENT_NODE) {
-                    entityElement = (Element) entityNode;
-
-                    String field = null;
-                    String value = null;
-
-                    //读取JavaBean的全限定类名
-                    String className = entityElement.getAttribute(CLASS_ATTRIBUTE);
-                    // 创建映射信息实体
-                    MappingInfo mappingInfo = new MappingInfo();
-                    mappingInfo.setClassName(className);
-
-                    // 读取 Property 节点
-                    NodeList properties = entityElement.getElementsByTagName(PROPERTY_ELEMENT);
-                    int properties_num = properties.getLength();
-
-                    // 解析 Property 节点
-                    for (int property_index = 0; property_index < properties_num; property_index++) {
-                        propertyNode = properties.item(property_index);
-                        if (propertyNode.getNodeType() == Node.ELEMENT_NODE) {
-                            // 读取 Field 和 Value 字段
-                            NodeList infoNodes = propertyNode.getChildNodes();
-                            int infoNode_num = infoNodes.getLength();
-                            for (int infoNode_index = 0; infoNode_index < infoNode_num; infoNode_index++) {
-                                infoNode = infoNodes.item(infoNode_index);
-                                if (infoNode.getNodeName().equals(FIELD_ELEMENT))
-                                    field = infoNode.getTextContent();
-                                if (infoNode.getNodeName().equals(VALUE_ELEMENT))
-                                    value = infoNode.getTextContent();
-                            }
-                            if (field != null && value != null) {
-                                // 添加到映射信息中
-                                mappingInfo.addFieldValueMapping(field, value);
-                                mappingInfo.addValueFieldMapping(value, field);
-                            }
-                        }
-                    }
-                    // 保存 Entity 映射信息
-                    excelJavaBeanMap.put(className, mappingInfo);
-                }
-            }
+            // 解析配置文件
+            this.excelJavaBeanMap = parseMappingInfo(doc);
 
         } catch (ParserConfigurationException | SAXException | IOException e) {
             e.printStackTrace();
+        }
+    }
+
+    /**
+     * 解析 Document root 下配置的所有 excel-javaBean 映射信息
+     *
+     * @param root Document 根节点
+     * @return 返回 excel-javaBean 映射信息
+     */
+    private Map<String, MappingInfo> parseMappingInfo(Document root) {
+        // 获取 root 下的所有 entity 节点
+        NodeList entities = root.getElementsByTagName(ENTITY_ELEMENT);
+
+        // 创建承载 MappingInfo 信息的Map
+        Map<String, MappingInfo> mappingInfoMap = new HashMap<>(entities.getLength());
+
+        // 解析 entity 节点
+        for (int index = 0; index < entities.getLength(); index++) {
+            // 创建 mappingInfo
+            MappingInfo mappingInfo = new MappingInfo();
+
+            // 解析节点信息
+            Node entityNode = entities.item(index);
+            if (entityNode.getNodeType() == Node.ELEMENT_NODE) {
+                Element entityElement = (Element) entityNode;
+                parseEntityElement(entityElement, mappingInfo);
+            }
+
+            // 保存节点信息
+            mappingInfoMap.put(mappingInfo.getClassName(), mappingInfo);
+        }
+        return mappingInfoMap;
+    }
+
+    /**
+     * 解析 entity 节点信息
+     *
+     * @param entityElement entity 节点
+     * @param mappingInfo   本 entity 节点包含的映射信息
+     */
+    private void parseEntityElement(Element entityElement, MappingInfo mappingInfo) {
+        // 解析 entity 的 class 属性
+        String className = entityElement.getAttribute(CLASS_ATTRIBUTE);
+        mappingInfo.setClassName(className);
+
+        // 读取并解析 property 节点
+        NodeList properties = entityElement.getElementsByTagName(PROPERTY_ELEMENT);
+        for (int index = 0; index < properties.getLength(); index++) {
+            Node propertyNode = properties.item(index);
+            if (propertyNode.getNodeType() == Node.ELEMENT_NODE) {
+                Element propertyElement = (Element) propertyNode;
+                parsePropertyElement(propertyElement, mappingInfo);
+            }
+        }
+    }
+
+    /**
+     * 解析 property 节点信息
+     *
+     * @param propertyElement property 节点
+     * @param mappingInfo     承载映射信息
+     */
+    private void parsePropertyElement(Element propertyElement, MappingInfo mappingInfo) {
+        NodeList infoNodes = propertyElement.getChildNodes();
+        String field = null;
+        String value = null;
+
+        for (int infoNode_index = 0; infoNode_index < infoNodes.getLength(); infoNode_index++) {
+            Node infoNode = infoNodes.item(infoNode_index);
+            if (infoNode.getNodeName().equals(FIELD_ELEMENT))
+                field = infoNode.getTextContent();
+            if (infoNode.getNodeName().equals(VALUE_ELEMENT))
+                value = infoNode.getTextContent();
+        }
+
+        // 添加到映射信息中
+        if (field != null && value != null) {
+            mappingInfo.addFieldValueMapping(field, value);
+            mappingInfo.addValueFieldMapping(value, field);
         }
     }
 
@@ -261,6 +305,11 @@ public class EJConvertor {
                     cell = row.createCell(cellCount++);
                     setCellValue1(value, workbook, cell);
                 }
+            }
+
+            // 调整 cell 大小
+            for (int cellIndex = 0; cellIndex < valuesList.size(); cellIndex++){
+                sheet.autoSizeColumn(cellIndex);
             }
 
             // 将 workBook 写入到 tempFile 中
@@ -468,12 +517,12 @@ public class EJConvertor {
         /**
          * Field - Value 映射
          */
-        private Map<String, String> fieldValueMapping = new HashMap<>();
+        private Map<String, String> fieldValueMapping = new LinkedHashMap<>();
 
         /**
          * Value - Field 映射
          */
-        private Map<String, String> valueFieldMapping = new HashMap<>();
+        private Map<String, String> valueFieldMapping = new LinkedHashMap<>();
 
         /**
          * 设置映射信息的JavaBean的全称类名
@@ -482,6 +531,15 @@ public class EJConvertor {
          */
         void setClassName(String className) {
             this.className = className;
+        }
+
+        /**
+         * 返回 mappingInfo 对应的 className
+         *
+         * @return className
+         */
+        String getClassName() {
+            return className;
         }
 
         /**
