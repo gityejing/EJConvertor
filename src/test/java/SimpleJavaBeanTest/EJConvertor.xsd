@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
-            targetNamespace="http://www.ken.com/schema/test"
+            targetNamespace="http://www.ken.com/schema/EJConvertor"
             elementFormDefault="qualified">
 
     <!-- 根标签 -->
@@ -20,6 +20,8 @@
             </xsd:choice>
         </xsd:sequence>
         <xsd:attribute name="class" type="xsd:string" use="required"/>
+        <xsd:attribute name="sheetName" type="xsd:string" use="optional"/>
+        <xsd:attribute name="boldHeading" type="xsd:boolean" use="optional"/>
     </xsd:complexType>
 
     <!--property标签-->

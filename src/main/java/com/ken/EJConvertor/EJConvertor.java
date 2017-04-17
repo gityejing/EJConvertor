@@ -2,6 +2,7 @@ package com.ken.EJConvertor;
 
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFFont;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -57,6 +58,16 @@ public class EJConvertor {
      * class 属性
      */
     private static final String CLASS_ATTRIBUTE = "class";
+
+    /**
+     * sheetName 属性
+     */
+    private static final String SHEET_NAME_ATTRIBUTE = "sheetName";
+
+    /**
+     * boldHeading 属性
+     */
+    private static final String BOLD_HEADING_ATTRIBUTE = "boldHeading";
 
     /**
      * JavaBean的映射信息
@@ -132,6 +143,16 @@ public class EJConvertor {
         // 解析 entity 的 class 属性
         String className = entityElement.getAttribute(CLASS_ATTRIBUTE);
         mappingInfo.setClassName(className);
+
+        // 解析 entity 的 sheetName 属性
+        if (entityElement.hasAttribute(SHEET_NAME_ATTRIBUTE))
+            mappingInfo.setSheetName(entityElement.getAttribute(SHEET_NAME_ATTRIBUTE));
+
+        // 解析 entity 的 boldHeading 属性
+        if (entityElement.hasAttribute(BOLD_HEADING_ATTRIBUTE)){
+            String isBoldHeading = entityElement.getAttribute(BOLD_HEADING_ATTRIBUTE);
+            mappingInfo.setBoldHeading(isBoldHeading.equals("true"));
+        }
 
         // 读取并解析 property 节点
         NodeList properties = entityElement.getElementsByTagName(PROPERTY_ELEMENT);
@@ -280,36 +301,45 @@ public class EJConvertor {
             // 创建 workBook 对象
             Workbook workbook = new XSSFWorkbook();
             // 创建 sheet 对象
-            Sheet sheet = workbook.createSheet();
+            Sheet sheet = workbook.createSheet(mappingInfo.getSheetName());
 
-            int rowCount = 0;
-            int cellCount;
+            int rowIndex = 0;
+            int cellIndex;
             Row row;
             Cell cell;
 
             // 写入第一行表头
-            row = sheet.createRow(rowCount++);
-            cellCount = 0;
+            row = sheet.createRow(rowIndex++);
+            cellIndex = 0;
+            XSSFFont font = (XSSFFont) workbook.createFont();
+            font.setBold(mappingInfo.isBoldHeading());
+            CellStyle cellStyle = workbook.createCellStyle();
+            cellStyle.setFont(font);
             for (String value : valuesList) {
-                cell = row.createCell(cellCount);
+                cell = row.createCell(cellIndex);
+
+                // 设置表头
                 cell.setCellValue(value);
-                cellCount++;
+                cellIndex++;
+
+                // 设置样式
+                cell.setCellStyle(cellStyle);
             }
 
             // 写入内容数据
             for (Object elem : elems) {
-                row = sheet.createRow(rowCount++);
-                cellCount = 0;
+                row = sheet.createRow(rowIndex++);
+                cellIndex = 0;
                 for (String methodName : methodList) {
                     Object value = getField(elem, methodName);
-                    cell = row.createCell(cellCount++);
+                    cell = row.createCell(cellIndex++);
                     setCellValue1(value, workbook, cell);
                 }
             }
 
             // 调整 cell 大小
-            for (int cellIndex = 0; cellIndex < valuesList.size(); cellIndex++){
-                sheet.autoSizeColumn(cellIndex);
+            for (int i = 0; i < valuesList.size(); i++){
+                sheet.autoSizeColumn(i);
             }
 
             // 将 workBook 写入到 tempFile 中
@@ -515,6 +545,16 @@ public class EJConvertor {
         private String className;
 
         /**
+         * excel 表中 sheet 的名称
+         */
+        private String sheetName = "sheet1";
+
+        /**
+         * 表格标题加粗
+         */
+        private boolean boldHeading = false;
+
+        /**
          * Field - Value 映射
          */
         private Map<String, String> fieldValueMapping = new LinkedHashMap<>();
@@ -540,6 +580,38 @@ public class EJConvertor {
          */
         String getClassName() {
             return className;
+        }
+
+        /**
+         * 设置表格的 sheet 名称
+         * @param sheetName sheet 名称
+         */
+        void setSheetName(String sheetName) {
+            this.sheetName = sheetName;
+        }
+
+        /**
+         * 获取表格的 sheet 名称
+         * @return 返回表格的 sheet 名称
+         */
+        String getSheetName() {
+            return sheetName;
+        }
+
+        /**
+         * 设置表头标题是否加粗
+         * @param boldHeading 是否加粗
+         */
+        void setBoldHeading(boolean boldHeading) {
+            this.boldHeading = boldHeading;
+        }
+
+        /**
+         * 获取表头标题是否加粗
+         * @return 返回表头标题是否加粗
+         */
+        boolean isBoldHeading() {
+            return boldHeading;
         }
 
         /**
@@ -591,13 +663,13 @@ public class EJConvertor {
             return fieldValueMapping;
         }
 
-        /**
-         * 获取 Value - Field 映射
-         *
-         * @return 返回Value - Field 映射
-         */
-        Map<String, String> getValueFieldMapping() {
-            return valueFieldMapping;
-        }
+//        /**
+//         * 获取 Value - Field 映射
+//         *
+//         * @return 返回Value - Field 映射
+//         */
+//        Map<String, String> getValueFieldMapping() {
+//            return valueFieldMapping;
+//        }
     }
 }

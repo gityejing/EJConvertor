@@ -52,10 +52,10 @@ public class Supplier {
 ```
 <?xml version="1.0" encoding="UTF-8"?>
 
-<configuration xmlns="http://www.ken.com/schema/test"
+<configuration xmlns="http://www.ken.com/schema/EJConvertor"
                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-               xsi:schemaLocation="http://www.ken.com/schema/test EJConvertor.xsd">
-	<entity class="com.ken.wms.domain.Supplier">
+               xsi:schemaLocation="http://www.ken.com/schema/EJConvertor EJConvertor.xsd">
+	<entity class="com.ken.wms.domain.Supplier" sheetName="测试表">
 		<property>
 			<field>name</field>
 			<value>供应商名</value>
@@ -166,11 +166,11 @@ public class JavaBean {
 ```
 <?xml version="1.0" encoding="UTF-8"?>
 
-<configuration xmlns="http://www.ken.com/schema/test"
+<configuration xmlns="http://www.ken.com/schema/EJConvertor"
                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-               xsi:schemaLocation="http://www.ken.com/schema/test xmlXSD.xsd">
+               xsi:schemaLocation="http://www.ken.com/schema/EJConvertor EJConvertor.xsd">
 
-    <entity class="SimpleJavaBeanTest.JavaBean">
+    <entity class="SimpleJavaBeanTest.JavaBean" sheetName="测试表" boldHeading="true">
         <property>
             <field>charType</field>
             <value>char原始类型</value>
