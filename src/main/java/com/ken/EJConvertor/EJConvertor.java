@@ -149,7 +149,7 @@ public class EJConvertor {
             mappingInfo.setSheetName(entityElement.getAttribute(SHEET_NAME_ATTRIBUTE));
 
         // 解析 entity 的 boldHeading 属性
-        if (entityElement.hasAttribute(BOLD_HEADING_ATTRIBUTE)){
+        if (entityElement.hasAttribute(BOLD_HEADING_ATTRIBUTE)) {
             String isBoldHeading = entityElement.getAttribute(BOLD_HEADING_ATTRIBUTE);
             mappingInfo.setBoldHeading(isBoldHeading.equals("true"));
         }
@@ -195,20 +195,20 @@ public class EJConvertor {
      * 讀取 Excel 文件中的内容 Excel 文件中的每一行代表了一个对象实例，而行中各列的属性值对应为对象中的各个属性值
      * 读取时，需要指定读取目标对象的类型以获得相关的映射信息，并且要求该对象已在配置文件中注册
      *
-     * @param classType 目标对象的类型
+     * @param javaBeanClass 目标对象的类型
      * @param file      数据来源的 Excel 文件
      * @return 包含若干个目标对象实例的 List
      */
-    public <T> List<T> excelReader(Class<T> classType, File file) {
+    public <T> List<T> excelReader(Class<T> javaBeanClass, File file) {
         // 参数检查
-        if (file == null || classType == null)
+        if (file == null || javaBeanClass == null)
             return null;
 
         // 初始化存放读取结果的 List
-        List<T> content = new ArrayList<>();
+        List<T> javaBeans = new ArrayList<>();
 
         // 获取类名和映射信息
-        String className = classType.getName();
+        String className = javaBeanClass.getName();
         MappingInfo mappingInfo = excelJavaBeanMap.get(className);
         if (mappingInfo == null)
             return null;
@@ -218,34 +218,38 @@ public class EJConvertor {
             Sheet dataSheet = workbook.getSheetAt(0);
             Row row;
             Cell cell;
+
             Iterator<Row> rowIterator = dataSheet.iterator();
             Iterator<Cell> cellIterator;
 
             // 读取第一行表头信息
             if (!rowIterator.hasNext())
                 return null;
-            List<Class<?>> fieldTypeList = new ArrayList<>();// 目标对象 field 类型列表
+            String fieldName;
+            Class<?> fieldClass;
             List<String> fieldNameList = new ArrayList<>();// 目标对象的 field 名称列表
+            List<Class<?>> fieldClassList = new ArrayList<>();// 目标对象 field 类型列表
             row = rowIterator.next();
             cellIterator = row.iterator();
-            String fieldName;
             while (cellIterator.hasNext()) {
                 cell = cellIterator.next();
 
-                // 获取 field 的名称以及类型
+                // 获取 value 对应的 field 的名称以及类型
                 fieldName = mappingInfo.getValueFieldMapping(cell.getStringCellValue());
-                Class<?> fieldType = classType.getDeclaredField(fieldName).getType();
+                fieldClass = javaBeanClass.getDeclaredField(fieldName).getType();
 
                 // 保存 field 的名称和类型信息
-                fieldTypeList.add(cell.getColumnIndex(), fieldType);
-                fieldNameList.add(cell.getColumnIndex(), fieldName);
+                if (fieldClass != null) {
+                    fieldNameList.add(cell.getColumnIndex(), fieldName);
+                    fieldClassList.add(cell.getColumnIndex(), fieldClass);
+                }
             }
 
-            // 逐行读取表格内容，创建对象赋值并导入
+            // 读取表格内容
             while (rowIterator.hasNext()) {
                 row = rowIterator.next();
                 cellIterator = row.iterator();
-                T bean = classType.newInstance();
+                T javaBean = javaBeanClass.newInstance();
 
                 // 读取单元格
                 while (cellIterator.hasNext()) {
@@ -253,29 +257,29 @@ public class EJConvertor {
                     int columnIndex = cell.getColumnIndex();
 
                     // 获取单元格的值，并设置对象中对应的属性
-                    Object fieldValue = getCellValue(fieldTypeList.get(columnIndex), cell);
+                    Object fieldValue = getCellValue(fieldClassList.get(columnIndex), cell);
                     if (fieldValue == null) continue;
-                    setField(bean, fieldNameList.get(columnIndex), fieldValue);
+                    setField(javaBean, fieldNameList.get(columnIndex), fieldValue);
                 }
                 // 放入结果
-                content.add(bean);
+                javaBeans.add(javaBean);
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
-        return content;
+        return javaBeans;
     }
 
     /**
      * 将 List 中的元素对象写入到 Excel 中，其中每一个对象的一行，每一列的内容为对象的属性
      *
      * @param classType 目标对象的类型
-     * @param elems     数据来源的 List
+     * @param javaBeans 数据来源的 List
      * @return 返回excel文件
      */
-    public File excelWriter(Class<?> classType, List<?> elems) {
+    public File excelWriter(Class<?> classType, List<?> javaBeans) {
         // 参数检查
-        if (classType == null || elems == null)
+        if (classType == null || javaBeans == null)
             return null;
 
         // 获取类名和映射信息
@@ -284,20 +288,16 @@ public class EJConvertor {
         if (mappingInfo == null)
             return null;
 
+        // 获取该 javaBean 注册需要写到 excel 的 field
+        Set<String> fields = mappingInfo.getFieldValueMapping().keySet();// 注册的 field 列表
+        List<String> valuesList = new ArrayList<>();// field 对应的 excel 表头 value 列表
+        fields.forEach(field -> valuesList.add(mappingInfo.getFieldValueMapping(field)));
+
+        // 创建对应的 excel 文件
         File excel = null;
         try {
             // 创建临时文件
             excel = File.createTempFile("excel", ".xlsx");
-
-            // 获取该 class 中定义的 field, 并将对应的信息保存到 List 中
-            List<String> methodList = new ArrayList<>();
-            List<String> valuesList = new ArrayList<>();
-            Set<String> fields = mappingInfo.getFieldValueMapping().keySet();
-            for (String field : fields) {
-                methodList.add(getGetterMethodName(field));
-                valuesList.add(mappingInfo.getFieldValueMapping(field));
-            }
-
             // 创建 workBook 对象
             Workbook workbook = new XSSFWorkbook();
             // 创建 sheet 对象
@@ -309,16 +309,14 @@ public class EJConvertor {
             Cell cell;
 
             // 写入第一行表头
-            row = sheet.createRow(rowIndex++);
             cellIndex = 0;
+            row = sheet.createRow(rowIndex++);
             XSSFFont font = (XSSFFont) workbook.createFont();
             font.setBold(mappingInfo.isBoldHeading());
             CellStyle cellStyle = workbook.createCellStyle();
             cellStyle.setFont(font);
             for (String value : valuesList) {
                 cell = row.createCell(cellIndex);
-
-                // 设置表头
                 cell.setCellValue(value);
                 cellIndex++;
 
@@ -327,25 +325,24 @@ public class EJConvertor {
             }
 
             // 写入内容数据
-            for (Object elem : elems) {
+            for (Object javaBean : javaBeans) {
                 row = sheet.createRow(rowIndex++);
                 cellIndex = 0;
-                for (String methodName : methodList) {
-                    Object value = getField(elem, methodName);
+                for (String fieldName : fields) {
+                    Object value = getField(javaBean, getGetterMethodName(fieldName));
                     cell = row.createCell(cellIndex++);
                     setCellValue1(value, workbook, cell);
                 }
             }
 
             // 调整 cell 大小
-            for (int i = 0; i < valuesList.size(); i++){
+            for (int i = 0; i < valuesList.size(); i++) {
                 sheet.autoSizeColumn(i);
             }
 
             // 将 workBook 写入到 tempFile 中
             FileOutputStream outputStream = new FileOutputStream(excel);
             workbook.write(outputStream);
-
             outputStream.flush();
             outputStream.close();
             workbook.close();
@@ -353,7 +350,6 @@ public class EJConvertor {
         } catch (Exception e) {
             e.printStackTrace();
         }
-
         return excel;
     }
 
@@ -466,11 +462,11 @@ public class EJConvertor {
             cell.setCellStyle(cellStyle);
         } else if (cellValueClass == java.sql.Date.class) {
             java.sql.Date v = (java.sql.Date) cellValue;
-            CellStyle cellStyle = workbook.createCellStyle();
-            CreationHelper creationHelper = workbook.getCreationHelper();
-            cellStyle.setDataFormat(creationHelper.createDataFormat().getFormat("yyyy/mm/dd"));
+//            CellStyle cellStyle = workbook.createCellStyle();
+//            CreationHelper creationHelper = workbook.getCreationHelper();
+//            cellStyle.setDataFormat(creationHelper.createDataFormat().getFormat("yyyy/mm/dd"));
             cell.setCellValue(v);
-            cell.setCellStyle(cellStyle);
+//            cell.setCellStyle(cellStyle);
         }
     }
 
@@ -510,29 +506,34 @@ public class EJConvertor {
     }
 
     /**
+     * setter 方法名缓存
+     */
+    private Map<String, String> setterMethodNameCache = new HashMap<>(64);
+
+    /**
+     * getter 方法名缓存
+     */
+    private Map<String, String> getterMethodNameCache = new HashMap<>(64);
+
+    /**
      * 构造 setter 方法的方法名
      *
-     * @param field 字段名
+     * @param fieldName 字段名
      * @return field对应的Setter方法名
      */
-    private String getSetterMethodName(String field) {
-        // 转换为首字母大写
-        String name = field.replaceFirst(field.substring(0, 1), field.substring(0, 1).toUpperCase());
-        // 拼接 set 并返回
-        return "set" + name;
+    private String getSetterMethodName(String fieldName) {
+        // 尝试从缓存中取出, 若没有则生成再放入
+        return setterMethodNameCache.computeIfAbsent(fieldName, n -> "set" + n.replace(n.substring(0, 1), n.substring(0, 1).toUpperCase()));
     }
 
     /**
      * 构造 getter 方法的方法名
      *
-     * @param field 字段名
+     * @param fieldName 字段名
      * @return field对应的Getter方法名
      */
-    private String getGetterMethodName(String field) {
-        // 转换为首字母大写
-        String name = field.replaceFirst(field.substring(0, 1), field.substring(0, 1).toUpperCase());
-        // 拼接 get 并返回
-        return "get" + name;
+    private String getGetterMethodName(String fieldName) {
+        return getterMethodNameCache.computeIfAbsent(fieldName, n -> "get" + n.replace(n.substring(0, 1), n.substring(0, 1).toUpperCase()));
     }
 
     /**
@@ -584,6 +585,7 @@ public class EJConvertor {
 
         /**
          * 设置表格的 sheet 名称
+         *
          * @param sheetName sheet 名称
          */
         void setSheetName(String sheetName) {
@@ -592,6 +594,7 @@ public class EJConvertor {
 
         /**
          * 获取表格的 sheet 名称
+         *
          * @return 返回表格的 sheet 名称
          */
         String getSheetName() {
@@ -600,6 +603,7 @@ public class EJConvertor {
 
         /**
          * 设置表头标题是否加粗
+         *
          * @param boldHeading 是否加粗
          */
         void setBoldHeading(boolean boldHeading) {
@@ -608,6 +612,7 @@ public class EJConvertor {
 
         /**
          * 获取表头标题是否加粗
+         *
          * @return 返回表头标题是否加粗
          */
         boolean isBoldHeading() {
