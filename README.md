@@ -340,6 +340,6 @@ charType=a
 , longBoxType=987654321
 , floatBoxType=123.45
 , doubleBoxType=456.123
-, utilDate=Fri Jan 26 00:00:00 CST 1900
-, sqlDate=1900-01-26}
+, utilDate=Wed Apr 19 09:28:48 CST 2017
+, sqlDate=2017-04-19}
 ```

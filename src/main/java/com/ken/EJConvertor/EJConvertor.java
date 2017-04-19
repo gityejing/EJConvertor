@@ -1,6 +1,7 @@
 package com.ken.EJConvertor;
 
 import org.apache.commons.lang3.math.NumberUtils;
+import org.apache.poi.hssf.usermodel.HSSFDateUtil;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFFont;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -257,7 +258,7 @@ public class EJConvertor {
                     int columnIndex = cell.getColumnIndex();
 
                     // 获取单元格的值，并设置对象中对应的属性
-                    Object fieldValue = getCellValue(fieldClassList.get(columnIndex), cell);
+                    Object fieldValue = getCellValue(fieldClassList.get(columnIndex), cell, workbook);
                     if (fieldValue == null) continue;
                     setField(javaBean, fieldNameList.get(columnIndex), fieldValue);
                 }
@@ -362,32 +363,39 @@ public class EJConvertor {
      * @return 返回 JavaBean 属性类型对应的值
      */
     @SuppressWarnings("unchecked")
-    private <T> T getCellValue(Class<T> fieldClass, Cell cell) {
+    private <T> T getCellValue(Class<T> fieldClass, Cell cell, Workbook workbook) {
 
-        // 获取 cell 的值
-        cell.setCellType(Cell.CELL_TYPE_STRING);
-        String cellValue = cell.getStringCellValue();
         // field 对值
         T fieldValue = null;
 
         if (fieldClass == int.class || fieldClass == Integer.class) {
             // convert to Integer
+            cell.setCellType(Cell.CELL_TYPE_STRING);
+            String cellValue = cell.getStringCellValue();
             Integer integer = NumberUtils.isNumber(cellValue) ? Double.valueOf(cellValue).intValue() : 0;
             fieldValue = (T) integer;
         } else if (fieldClass == long.class || fieldClass == Long.class) {
             // convert to Long
+            cell.setCellType(Cell.CELL_TYPE_STRING);
+            String cellValue = cell.getStringCellValue();
             Long l = NumberUtils.isNumber(cellValue) ? Double.valueOf(cellValue).longValue() : 0;
             fieldValue = (T) l;
         } else if (fieldClass == float.class || fieldClass == Float.class) {
             // convert to Float
+            cell.setCellType(Cell.CELL_TYPE_STRING);
+            String cellValue = cell.getStringCellValue();
             Float f = NumberUtils.isNumber(cellValue) ? Float.valueOf(cellValue) : 0;
             fieldValue = (T) f;
         } else if (fieldClass == double.class || fieldClass == Double.class) {
             // convert to Double
+            cell.setCellType(Cell.CELL_TYPE_STRING);
+            String cellValue = cell.getStringCellValue();
             Double d = NumberUtils.isNumber(cellValue) ? Double.valueOf(cellValue) : 0;
             fieldValue = (T) d;
         } else if (fieldClass == short.class || fieldClass == Short.class) {
             // convert to Short
+            cell.setCellType(Cell.CELL_TYPE_STRING);
+            String cellValue = cell.getStringCellValue();
             Short s = NumberUtils.isNumber(cellValue) ? Double.valueOf(cellValue).shortValue() : 0;
             fieldValue = (T) s;
         } else if (fieldClass == boolean.class || fieldClass == Boolean.class) {
@@ -397,27 +405,32 @@ public class EJConvertor {
             fieldValue = (T) b;
         } else if (fieldClass == char.class || fieldClass == Character.class) {
             // convert to Character
+            cell.setCellType(Cell.CELL_TYPE_STRING);
+            String cellValue = cell.getStringCellValue();
             Character c = cellValue.charAt(0);
             fieldValue = (T) c;
         } else if (fieldClass == byte.class || fieldClass == Byte.class) {
             // convert to Byte
+            cell.setCellType(Cell.CELL_TYPE_STRING);
+            String cellValue = cell.getStringCellValue();
             Byte b = NumberUtils.isNumber(cellValue) ? Double.valueOf(cellValue).byteValue() : 0;
             fieldValue = (T) b;
         } else if (fieldClass == String.class) {
             // convert to String
+            cell.setCellType(Cell.CELL_TYPE_STRING);
+            String cellValue = cell.getStringCellValue();
             fieldValue = (T) cellValue;
         } else if (fieldClass == java.util.Date.class) {
             // convert to java.util.Date
-            cell.setCellType(Cell.CELL_TYPE_NUMERIC);
-            java.util.Date d = cell.getDateCellValue();
-            fieldValue = (T) d;
+            fieldValue = HSSFDateUtil.isCellDateFormatted(cell) ? (T) cell.getDateCellValue() : null;
         } else if (fieldClass == java.sql.Date.class) {
             // convert to java.sql.Date
-            cell.setCellType(Cell.CELL_TYPE_NUMERIC);
-            java.sql.Date d = new java.sql.Date(cell.getDateCellValue().getTime());
-            fieldValue = (T) d;
+            fieldValue = null;
+            if (HSSFDateUtil.isCellDateFormatted(cell)){
+                java.sql.Date date = new java.sql.Date(cell.getDateCellValue().getTime());
+                fieldValue = (T) date;
+            }
         }
-
         return fieldValue;
     }
 
@@ -462,11 +475,11 @@ public class EJConvertor {
             cell.setCellStyle(cellStyle);
         } else if (cellValueClass == java.sql.Date.class) {
             java.sql.Date v = (java.sql.Date) cellValue;
-//            CellStyle cellStyle = workbook.createCellStyle();
-//            CreationHelper creationHelper = workbook.getCreationHelper();
-//            cellStyle.setDataFormat(creationHelper.createDataFormat().getFormat("yyyy/mm/dd"));
+            CellStyle cellStyle = workbook.createCellStyle();
+            CreationHelper creationHelper = workbook.getCreationHelper();
+            cellStyle.setDataFormat(creationHelper.createDataFormat().getFormat("yyyy/mm/dd"));
             cell.setCellValue(v);
-//            cell.setCellStyle(cellStyle);
+            cell.setCellStyle(cellStyle);
         }
     }
 
