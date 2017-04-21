@@ -4,7 +4,7 @@
                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                xsi:schemaLocation="http://www.ken.com/schema/EJConvertor EJConvertor.xsd">
 
-    <entity class="SimpleJavaBeanTest.JavaBean" sheetName="测试表" boldHeading="true">
+    <entity class="SimpleJavaBeanTest1.JavaBean" sheetName="测试表" boldHeading="true">
         <property>
             <field>charType</field>
             <value>char原始类型</value>

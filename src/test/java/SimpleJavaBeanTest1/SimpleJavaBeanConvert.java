@@ -1,4 +1,4 @@
-package SimpleJavaBeanTest;
+package SimpleJavaBeanTest1;
 
 import com.ken.EJConvertor.EJConvertor;
 import org.junit.Test;
@@ -9,10 +9,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
+ * 数据类型测试
  * Created by Ken on 2017/4/15.
  */
 public class SimpleJavaBeanConvert {
 
+    /**
+     * 测试各种数据类型的 field 转换到 excel 的 cell 中的值
+     * @throws Exception Exception
+     */
     @Test
     public void convertJavaBeanToExcel() throws Exception{
 
@@ -43,23 +48,27 @@ public class SimpleJavaBeanConvert {
         javaBeans.add(javaBean);
 
         // create javaBean - Excel convertor
-        EJConvertor ejConvertor = new EJConvertor("src/test/java/SimpleJavaBeanTest/EJConvertorConfig.xml");
+        EJConvertor ejConvertor = new EJConvertor("src/test/java/SimpleJavaBeanTest1/EJConvertorConfig.xml");
 
         File excel = ejConvertor.excelWriter(JavaBean.class, javaBeans);
         if (excel == null)
             System.out.println("null");
         else {
-            File fileSave = new File("src/test/java/SimpleJavaBeanTest/excel.xlsx");
+            File fileSave = new File("src/test/java/SimpleJavaBeanTest1/excel.xlsx");
             Files.copy(excel.toPath(), fileSave.toPath());
         }
     }
+
+    /**
+     * 测试读取 cell 中的值设置到不同数据类型的 field 中
+     */
     @Test
     public void convertExcelToJavaBean(){
         // create javaBean - Excel convertor
-        EJConvertor ejConvertor = new EJConvertor("src/test/java/SimpleJavaBeanTest/EJConvertorConfig.xml");
+        EJConvertor ejConvertor = new EJConvertor("src/test/java/SimpleJavaBeanTest1/EJConvertorConfig.xml");
 
         // prepare the excel file
-        File excel = new File("src/test/java/SimpleJavaBeanTest/excel.xlsx");
+        File excel = new File("src/test/java/SimpleJavaBeanTest1/excel.xlsx");
 
         // read the content of excel
         List<JavaBean> javaBeans = ejConvertor.excelReader(JavaBean.class, excel);

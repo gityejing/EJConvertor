@@ -1,4 +1,4 @@
-package SimpleJavaBeanTest;
+package SimpleJavaBeanTest1;
 
 import java.util.Date;
 

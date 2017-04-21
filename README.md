@@ -97,7 +97,7 @@ public class Supplier {
    2. 指定配置文件的路径
 
       ```
-      EJConvertor ejConvertor = new EJConvertor("src/test/java/SimpleJavaBeanTest/EJConvertorConfig.xml");
+      EJConvertor ejConvertor = new EJConvertor("src/test/java/SimpleJavaBeanTest1/EJConvertorConfig.xml");
       ```
 
 2. 将 javaBean 转换为 Excel 文件
@@ -170,7 +170,7 @@ public class JavaBean {
                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                xsi:schemaLocation="http://www.ken.com/schema/EJConvertor EJConvertor.xsd">
 
-    <entity class="SimpleJavaBeanTest.JavaBean" sheetName="测试表" boldHeading="true">
+    <entity class="SimpleJavaBeanTest1.JavaBean" sheetName="测试表" boldHeading="true">
         <property>
             <field>charType</field>
             <value>char原始类型</value>
@@ -286,13 +286,13 @@ public class JavaBean {
         javaBeans.add(javaBean);
 
         // create javaBean - Excel convertor
-        EJConvertor ejConvertor = new EJConvertor("src/test/java/SimpleJavaBeanTest/EJConvertorConfig.xml");
+        EJConvertor ejConvertor = new EJConvertor("src/test/java/SimpleJavaBeanTest1/EJConvertorConfig.xml");
 
         File excel = ejConvertor.excelWriter(JavaBean.class, javaBeans);
         if (excel == null)
             System.out.println("null");
         else {
-            File fileSave = new File("src/test/java/SimpleJavaBeanTest/excel.xlsx");
+            File fileSave = new File("src/test/java/SimpleJavaBeanTest1/excel.xlsx");
             Files.copy(excel.toPath(), fileSave.toPath());
         }
     }
@@ -307,10 +307,10 @@ public class JavaBean {
 	@Test
     public void convertExcelToJavaBean(){
         // create javaBean - Excel convertor
-        EJConvertor ejConvertor = new EJConvertor("src/test/java/SimpleJavaBeanTest/EJConvertorConfig.xml");
+        EJConvertor ejConvertor = new EJConvertor("src/test/java/SimpleJavaBeanTest1/EJConvertorConfig.xml");
 
         // prepare the excel file
-        File excel = new File("src/test/java/SimpleJavaBeanTest/excel.xlsx");
+        File excel = new File("src/test/java/SimpleJavaBeanTest1/excel.xlsx");
 
         // read the content of excel
         List<JavaBean> javaBeans = ejConvertor.excelReader(JavaBean.class, excel);

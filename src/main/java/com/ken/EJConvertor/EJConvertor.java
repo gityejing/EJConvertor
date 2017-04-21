@@ -18,6 +18,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.*;
 
@@ -197,7 +198,7 @@ public class EJConvertor {
      * 读取时，需要指定读取目标对象的类型以获得相关的映射信息，并且要求该对象已在配置文件中注册
      *
      * @param javaBeanClass 目标对象的类型
-     * @param file      数据来源的 Excel 文件
+     * @param file          数据来源的 Excel 文件
      * @return 包含若干个目标对象实例的 List
      */
     public <T> List<T> excelReader(Class<T> javaBeanClass, File file) {
@@ -227,6 +228,7 @@ public class EJConvertor {
             if (!rowIterator.hasNext())
                 return null;
             String fieldName;
+            Field fieldInstance;
             Class<?> fieldClass;
             List<String> fieldNameList = new ArrayList<>();// 目标对象的 field 名称列表
             List<Class<?>> fieldClassList = new ArrayList<>();// 目标对象 field 类型列表
@@ -237,13 +239,12 @@ public class EJConvertor {
 
                 // 获取 value 对应的 field 的名称以及类型
                 fieldName = mappingInfo.getValueFieldMapping(cell.getStringCellValue());
-                fieldClass = javaBeanClass.getDeclaredField(fieldName).getType();
+                fieldClass = (fieldName != null && (fieldInstance = javaBeanClass.getDeclaredField(fieldName)) != null) ?
+                        fieldInstance.getType() : null;
 
-                // 保存 field 的名称和类型信息
-                if (fieldClass != null) {
-                    fieldNameList.add(cell.getColumnIndex(), fieldName);
-                    fieldClassList.add(cell.getColumnIndex(), fieldClass);
-                }
+                // 保存 value 对应的 field 的名称和类型
+                fieldClassList.add(cell.getColumnIndex(), fieldClass);
+                fieldNameList.add(cell.getColumnIndex(), fieldName);
             }
 
             // 读取表格内容
@@ -258,7 +259,7 @@ public class EJConvertor {
                     int columnIndex = cell.getColumnIndex();
 
                     // 获取单元格的值，并设置对象中对应的属性
-                    Object fieldValue = getCellValue(fieldClassList.get(columnIndex), cell, workbook);
+                    Object fieldValue = getCellValue(fieldClassList.get(columnIndex), cell);
                     if (fieldValue == null) continue;
                     setField(javaBean, fieldNameList.get(columnIndex), fieldValue);
                 }
@@ -363,7 +364,7 @@ public class EJConvertor {
      * @return 返回 JavaBean 属性类型对应的值
      */
     @SuppressWarnings("unchecked")
-    private <T> T getCellValue(Class<T> fieldClass, Cell cell, Workbook workbook) {
+    private <T> T getCellValue(Class<T> fieldClass, Cell cell) {
 
         // field 对值
         T fieldValue = null;
@@ -426,7 +427,7 @@ public class EJConvertor {
         } else if (fieldClass == java.sql.Date.class) {
             // convert to java.sql.Date
             fieldValue = null;
-            if (HSSFDateUtil.isCellDateFormatted(cell)){
+            if (HSSFDateUtil.isCellDateFormatted(cell)) {
                 java.sql.Date date = new java.sql.Date(cell.getDateCellValue().getTime());
                 fieldValue = (T) date;
             }
@@ -680,14 +681,5 @@ public class EJConvertor {
         Map<String, String> getFieldValueMapping() {
             return fieldValueMapping;
         }
-
-//        /**
-//         * 获取 Value - Field 映射
-//         *
-//         * @return 返回Value - Field 映射
-//         */
-//        Map<String, String> getValueFieldMapping() {
-//            return valueFieldMapping;
-//        }
     }
 }
