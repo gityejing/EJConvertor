@@ -1,6 +1,6 @@
 # Excel - JavaBean 转换
 
-实现 excel 与 javaBean field 之间的相互转换，采用配置文件设置两者之间的映射
+实现 excel 与 javaBean 字段之间的相互转换，采用配置文件、或注解的方式设置两者之间的映射
 
 
 
@@ -31,62 +31,94 @@
 
 ## 配置
 
-示例：
+* 使用配置文件的配置方式
 
-```
-public class Supplier {
+  示例：
 
-	private Integer id;// 供应商ID
-	private String name;// 供应商名
-	private String personInCharge;// 负责人
-	private String tel;// 联系电话
-	private String email;// 电子邮件
-	private String address;// 供应商地址
-	
-	// setter and getter
-}
-```
+  ```
+  public class Supplier {
 
-对应的配置文件设置：
+  	private Integer id;// 供应商ID
+  	private String name;// 供应商名
+  	private String personInCharge;// 负责人
+  	private String tel;// 联系电话
+  	private String email;// 电子邮件
+  	private String address;// 供应商地址
+  	
+  	// setter and getter
+  }
+  ```
 
-```
-<?xml version="1.0" encoding="UTF-8"?>
+  对应的配置文件设置：
 
-<configuration xmlns="http://www.ken.com/schema/EJConvertor"
-               xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-               xsi:schemaLocation="http://www.ken.com/schema/EJConvertor EJConvertor.xsd">
-	<entity class="com.ken.wms.domain.Supplier" sheetName="测试表">
-		<property>
-			<field>name</field>
-			<value>供应商名</value>
-		</property>
-		<property>
-			<field>personInCharge</field>
-			<value>负责人</value>
-		</property>
-		<property>
-			<field>tel</field>
-			<value>联系电话</value>
-		</property>
-		<property>
-			<field>email</field>
-			<value>电子邮件</value>
-		</property>
-		<property>
-			<field>address</field>
-			<value>供应商地址</value>
-		</property>
-	</entity>
-</configuration>
-```
+  ```
+  <?xml version="1.0" encoding="UTF-8"?>
 
-配置文件中主要包括：`entity`、`property`、`field`、`value` 四种标签。
+  <configuration xmlns="http://www.ken.com/schema/EJConvertor"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xsi:schemaLocation="http://www.ken.com/schema/EJConvertor EJConvertor.xsd">
+  	<entity class="com.ken.wms.domain.Supplier" sheetName="测试表">
+  		<property>
+  			<field>name</field>
+  			<value>供应商名</value>
+  		</property>
+  		<property>
+  			<field>personInCharge</field>
+  			<value>负责人</value>
+  		</property>
+  		<property>
+  			<field>tel</field>
+  			<value>联系电话</value>
+  		</property>
+  		<property>
+  			<field>email</field>
+  			<value>电子邮件</value>
+  		</property>
+  		<property>
+  			<field>address</field>
+  			<value>供应商地址</value>
+  		</property>
+  	</entity>
+  </configuration>
+  ```
 
-* 每一个`entity`代表了一个 javaBean，也即在进行转换时，一个`entity`对应着一个 Excel 表格。`entity`标签的属性`class`配置 javaBean 的全称类名
-* 每一个`property`代表 javaBean 的一个属性
-* `property`标签的子元素`field`代表某一个属性字段在 javaBean 中的名称，而子元素 `value`  代表该属性字段属性在 Excel 表格所在列的表头名称
+  配置文件中主要包括：`entity`、`property`、`field`、`value` 四种标签。
 
+  * 每一个`entity`代表了一个 javaBean，也即在进行转换时，一个`entity`对应着一个 Excel 表格。`entity`标签的属性`class`配置 javaBean 的全称类名
+  * 每一个`property`代表 javaBean 的一个属性
+  * `property`标签的子元素`field`代表某一个属性字段在 javaBean 中的名称，而子元素 `value`  代表该属性字段属性在 Excel 表格所在列的表头名称
 
+* 使用注解的配置方式
+
+  示例：
+
+  ```
+  @EJConvertorTable(sheetName = "用户信息", boldHeading = true)
+  public class User {
+
+      @EJConvertorColumn(columnTitle = "用户ID annotation")
+      private Integer userID;
+
+      @EJConvertorColumn(columnTitle = "用户名 annotation")
+      private String userName;
+
+      @EJConvertorColumn(columnTitle = "年龄 annotation")
+      private int age;
+
+      @EJConvertorColumn(columnTitle = "性别 annotation")
+      private String gender;
+
+      @EJConvertorColumn(columnTitle = "体重 annotation")
+      private double weight;
+      
+      // getter and setter
+  }
+  ```
+
+  注解解释：
+
+  * 使用`@EJConvertorTable`注解标注后，该 javaBean 将可以与 excel 文件相互转换。其中 `@EJConvertorTable` 包含以下属性：`sheetName` 表示对应生成的 excel 文件中 sheet 的名称；`boldHeading` 表示生成的 excel 文件中的表头标题是否需要加粗。
+  * 使用 `EJConvertorColumn` 注解指明需要转换到 excel 文件或者需要从 excel 文件转换而来的 field，其中需要设置属性 `columnTitle` ，该属性为该 field 在生成的 excel 文件中所在列的标题。
 
 ## 使用
 

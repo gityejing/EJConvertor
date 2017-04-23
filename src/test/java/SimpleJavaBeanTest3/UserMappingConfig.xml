@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<configuration xmlns="http://www.ken.com/schema/EJConvertor"
+               xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+               xsi:schemaLocation="http://www.ken.com/schema/EJConvertor EJConvertor.xsd">
+
+    <entity class="SimpleJavaBeanTest2.User" sheetName="用户信息" boldHeading="true">
+        <property>
+            <field>userID</field>
+            <value>用户ID</value>
+        </property>
+        <property>
+            <field>userName</field>
+            <value>用户名</value>
+        </property>
+        <property>
+            <field>age</field>
+            <value>年龄</value>
+        </property>
+        <property>
+            <field>gender</field>
+            <value>性别</value>
+        </property>
+        <property>
+            <field>weight</field>
+            <value>体重</value>
+        </property>
+    </entity>
+
+</configuration>

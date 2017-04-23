@@ -1,5 +1,7 @@
 package com.ken.EJConvertor;
 
+import com.ken.EJConvertor.annotation.EJConvertorColumn;
+import com.ken.EJConvertor.annotation.EJConvertorTable;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.poi.hssf.usermodel.HSSFDateUtil;
 import org.apache.poi.ss.usermodel.*;
@@ -23,7 +25,7 @@ import java.lang.reflect.Method;
 import java.util.*;
 
 /**
- * Excel -JavaBean 转换器
+ * Excel - JavaBean 转换器
  *
  * @author Ken
  * @since 2017/3/27.
@@ -197,20 +199,114 @@ public class EJConvertor {
      * 讀取 Excel 文件中的内容 Excel 文件中的每一行代表了一个对象实例，而行中各列的属性值对应为对象中的各个属性值
      * 读取时，需要指定读取目标对象的类型以获得相关的映射信息，并且要求该对象已在配置文件中注册
      *
-     * @param javaBeanClass 目标对象的类型
-     * @param file          数据来源的 Excel 文件
+     * @param javaBeanClassType 目标对象的类型
+     * @param file              数据来源的 Excel 文件
      * @return 包含若干个目标对象实例的 List
      */
-    public <T> List<T> excelReader(Class<T> javaBeanClass, File file) {
+    public <T> List<T> excelReader(Class<T> javaBeanClassType, File file) {
         // 参数检查
-        if (file == null || javaBeanClass == null)
+        if (file == null || javaBeanClassType == null)
             return null;
 
+        // 检查该 javaBean 是否使用 annotation 注解的方式配置
+        if (javaBeanClassType.getAnnotation(EJConvertorTable.class) != null) {
+            return usingAnnotationExcelReader(javaBeanClassType, file);
+        } else {
+            // 否则尝试使用配置文件的信息进行进行转换
+            return usingConfigExcelReader(javaBeanClassType, file);
+        }
+    }
+
+    /**
+     * 使用 annotation 的配置信息读取 Excel 文件
+     *
+     * @param javaBeanClassType javaBean 的 Class 类型
+     * @param file              excel 文件
+     * @param <T>               javaBean 泛型
+     * @return 返回包含从 excel 中读取的 javaBean 的 List
+     */
+    private <T> List<T> usingAnnotationExcelReader(Class<T> javaBeanClassType, File file) {
+        // 初始化存放读取结果的 List
+        List<T> javaBeans = new ArrayList<>();
+
+        // 获取 annotation 信息
+        List<Field> fieldsToConvert = new ArrayList<>();// 声明需要转换的 field 信息
+        Arrays.stream(javaBeanClassType.getDeclaredFields()).filter(field -> field.getAnnotation(EJConvertorColumn.class) != null).forEach(fieldsToConvert::add);
+        Map<String, String> valueFieldMap = new HashMap<>();// fieldTitle - field 映射信息
+        fieldsToConvert.forEach(field -> valueFieldMap.put(field.getAnnotation(EJConvertorColumn.class).columnTitle(), field.getName()));
+
+        // 读取 Excel 文件
+        try (Workbook workbook = new XSSFWorkbook(new FileInputStream(file))) {
+            Sheet dataSheet = workbook.getSheetAt(0);
+            Row row;
+            Cell cell;
+
+            Iterator<Row> rowIterator = dataSheet.iterator();
+            Iterator<Cell> cellIterator;
+
+            // 读取第一行表头信息
+            if (!rowIterator.hasNext())
+                return null;
+            String fieldName;
+            Field fieldInstance;
+            Class<?> fieldClass;
+            List<String> fieldNameList = new ArrayList<>();// 目标对象的 field 名称列表
+            List<Class<?>> fieldClassList = new ArrayList<>();// 目标对象 field 类型列表
+            row = rowIterator.next();
+            cellIterator = row.iterator();
+            while (cellIterator.hasNext()) {
+                cell = cellIterator.next();
+
+                // 获取 value 对应的 field 的名称以及类型
+                fieldName = valueFieldMap.get(cell.getStringCellValue());
+                fieldClass = (fieldName != null && (fieldInstance = javaBeanClassType.getDeclaredField(fieldName)) != null) ?
+                        fieldInstance.getType() : null;
+
+                // 保存 value 对应的 field 的名称和类型
+                fieldClassList.add(cell.getColumnIndex(), fieldClass);
+                fieldNameList.add(cell.getColumnIndex(), fieldName);
+            }
+
+            // 读取表格内容
+            while (rowIterator.hasNext()) {
+                row = rowIterator.next();
+                cellIterator = row.iterator();
+                T javaBean = javaBeanClassType.newInstance();
+
+                // 读取单元格
+                while (cellIterator.hasNext()) {
+                    cell = cellIterator.next();
+                    int columnIndex = cell.getColumnIndex();
+
+                    // 获取单元格的值，并设置对象中对应的属性
+                    Object fieldValue = getCellValue(fieldClassList.get(columnIndex), cell);
+                    if (fieldValue == null) continue;
+                    setField(javaBean, fieldNameList.get(columnIndex), fieldValue);
+                }
+                // 放入结果
+                javaBeans.add(javaBean);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return javaBeans;
+    }
+
+    /**
+     * 使用配置文件中的信息读取 Excel 文件
+     *
+     * @param javaBeanClassType javaBean 的 Class 类型
+     * @param file              excel 文件
+     * @param <T>               javaBean 泛型
+     * @return 返回包含从 excel 中读取的 javaBean 的 List
+     */
+    private <T> List<T> usingConfigExcelReader(Class<T> javaBeanClassType, File file) {
         // 初始化存放读取结果的 List
         List<T> javaBeans = new ArrayList<>();
 
         // 获取类名和映射信息
-        String className = javaBeanClass.getName();
+        String className = javaBeanClassType.getName();
         MappingInfo mappingInfo = excelJavaBeanMap.get(className);
         if (mappingInfo == null)
             return null;
@@ -239,7 +335,7 @@ public class EJConvertor {
 
                 // 获取 value 对应的 field 的名称以及类型
                 fieldName = mappingInfo.getValueFieldMapping(cell.getStringCellValue());
-                fieldClass = (fieldName != null && (fieldInstance = javaBeanClass.getDeclaredField(fieldName)) != null) ?
+                fieldClass = (fieldName != null && (fieldInstance = javaBeanClassType.getDeclaredField(fieldName)) != null) ?
                         fieldInstance.getType() : null;
 
                 // 保存 value 对应的 field 的名称和类型
@@ -251,7 +347,7 @@ public class EJConvertor {
             while (rowIterator.hasNext()) {
                 row = rowIterator.next();
                 cellIterator = row.iterator();
-                T javaBean = javaBeanClass.newInstance();
+                T javaBean = javaBeanClassType.newInstance();
 
                 // 读取单元格
                 while (cellIterator.hasNext()) {
@@ -275,20 +371,114 @@ public class EJConvertor {
     /**
      * 将 List 中的元素对象写入到 Excel 中，其中每一个对象的一行，每一列的内容为对象的属性
      *
-     * @param classType 目标对象的类型
-     * @param javaBeans 数据来源的 List
+     * @param javaBeanClassType 目标对象的类型
+     * @param javaBeans         数据来源的 List
      * @return 返回excel文件
      */
-    public File excelWriter(Class<?> classType, List<?> javaBeans) {
+    public File excelWriter(Class<?> javaBeanClassType, List<?> javaBeans) {
         // 参数检查
-        if (classType == null || javaBeans == null)
+        if (javaBeanClassType == null || javaBeans == null)
             return null;
 
-        // 获取类名和映射信息
-        String className = classType.getName();
+        // 检查该 javaBean 是否使用 annotation 注解的方式配置
+        if (javaBeanClassType.getAnnotation(EJConvertorTable.class) != null) {
+            return usingAnnotationExcelWriter(javaBeanClassType, javaBeans);
+        }
+
+        // 否则尝试寻找是否在配置文件中声明
+        String className = javaBeanClassType.getName();
         MappingInfo mappingInfo = excelJavaBeanMap.get(className);
-        if (mappingInfo == null)
-            return null;
+        if (mappingInfo != null) {
+            return usingConfigExcelWriter(mappingInfo, javaBeans);
+        }
+
+        return null;
+    }
+
+    /**
+     * 使用该 javaBean 注解的信息生成对应的 excel
+     *
+     * @param javaBeanClassType javaBean 的 class 类型
+     * @param javaBeans         javaBean 泪飙
+     * @return 返回生成的 excel 文件
+     */
+    private File usingAnnotationExcelWriter(Class<?> javaBeanClassType, List<?> javaBeans) {
+
+        // 获取 EJConvertorTable 注解的 sheetName 属性
+        String sheetName = javaBeanClassType.getAnnotation(EJConvertorTable.class).sheetName();
+        // 获取 EJConvertorTable 注解的 boldHeading 属性
+        boolean boldHeader = javaBeanClassType.getAnnotation(EJConvertorTable.class).boldHeading();
+
+        // 获取 field 注解信息
+        List<Field> fieldsToConvert = new ArrayList<>();// 需要转换的 field
+        Arrays.stream(javaBeanClassType.getDeclaredFields()).filter(field -> field.getAnnotation(EJConvertorColumn.class) != null).forEach(fieldsToConvert::add);
+        List<String> fieldNames = new ArrayList<>(fieldsToConvert.size());// field 的名称
+        fieldsToConvert.forEach(field -> fieldNames.add(field.getName()));
+        List<String> fieldTitles = new ArrayList<>(fieldsToConvert.size());// field 对应的标题
+        fieldsToConvert.forEach(field -> fieldTitles.add(field.getAnnotation(EJConvertorColumn.class).columnTitle()));
+
+        File excel = null;
+        try {
+            // 创建临时文件
+            excel = File.createTempFile("excel", ".xlsx");
+            // 创建 workBook 对象
+            Workbook workbook = new XSSFWorkbook();
+            // 创建 sheet 对象
+            Sheet sheet = workbook.createSheet(sheetName);
+
+            int rowIndex = 0;
+            int cellIndex;
+            Row row;
+            Cell cell;
+
+            // 写入第一行表头
+            cellIndex = 0;
+            row = sheet.createRow(rowIndex++);
+            CellStyle cellStyle = createCellFontBoldStyle(workbook, boldHeader);
+            for (String title : fieldTitles) {
+                cell = row.createCell(cellIndex);
+                cell.setCellValue(title);
+                cellIndex++;
+
+                // 设置样式
+                cell.setCellStyle(cellStyle);
+            }
+
+            // 写入内容数据
+            for (Object javaBean : javaBeans) {
+                row = sheet.createRow(rowIndex++);
+                cellIndex = 0;
+                for (String fieldName : fieldNames) {
+                    Object value = getField(javaBean, getGetterMethodName(fieldName));
+                    cell = row.createCell(cellIndex++);
+                    setCellValue1(value, workbook, cell);
+                }
+            }
+
+            // 调整 cell 大小
+            setAutoCellSize(sheet, fieldsToConvert.size());
+
+            // 将 workBook 写入到 tempFile 中
+            FileOutputStream outputStream = new FileOutputStream(excel);
+            workbook.write(outputStream);
+            outputStream.flush();
+            outputStream.close();
+            workbook.close();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return excel;
+    }
+
+    /**
+     * 使用配置文件信息生成对应的 excel
+     *
+     * @param mappingInfo javaBean 在配置文件中声明的映射信息
+     * @param javaBeans   javaBean 列表
+     * @return 返回生成的 excel 文件
+     */
+    private File usingConfigExcelWriter(MappingInfo mappingInfo, List<?> javaBeans) {
 
         // 获取该 javaBean 注册需要写到 excel 的 field
         Set<String> fields = mappingInfo.getFieldValueMapping().keySet();// 注册的 field 列表
@@ -313,10 +503,7 @@ public class EJConvertor {
             // 写入第一行表头
             cellIndex = 0;
             row = sheet.createRow(rowIndex++);
-            XSSFFont font = (XSSFFont) workbook.createFont();
-            font.setBold(mappingInfo.isBoldHeading());
-            CellStyle cellStyle = workbook.createCellStyle();
-            cellStyle.setFont(font);
+            CellStyle cellStyle = createCellFontBoldStyle(workbook, mappingInfo.isBoldHeading());
             for (String value : valuesList) {
                 cell = row.createCell(cellIndex);
                 cell.setCellValue(value);
@@ -338,9 +525,7 @@ public class EJConvertor {
             }
 
             // 调整 cell 大小
-            for (int i = 0; i < valuesList.size(); i++) {
-                sheet.autoSizeColumn(i);
-            }
+            setAutoCellSize(sheet, valuesList.size());
 
             // 将 workBook 写入到 tempFile 中
             FileOutputStream outputStream = new FileOutputStream(excel);
@@ -353,6 +538,33 @@ public class EJConvertor {
             e.printStackTrace();
         }
         return excel;
+    }
+
+    /**
+     * 设置单元格自动宽度
+     *
+     * @param sheet  excel sheet
+     * @param colNum 单元格数量
+     */
+    private void setAutoCellSize(Sheet sheet, int colNum) {
+        for (int i = 0; i < colNum; i++) {
+            sheet.autoSizeColumn(i);
+        }
+    }
+
+    /**
+     * 创建单元格样式
+     *
+     * @param workbook workbook
+     * @param isBold   是否加粗
+     * @return 返回单元格样式
+     */
+    private CellStyle createCellFontBoldStyle(Workbook workbook, boolean isBold) {
+        XSSFFont font = (XSSFFont) workbook.createFont();
+        font.setBold(isBold);
+        CellStyle cellStyle = workbook.createCellStyle();
+        cellStyle.setFont(font);
+        return cellStyle;
     }
 
     /**
